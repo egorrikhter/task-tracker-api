@@ -18,7 +18,7 @@ url_object = URL.create(
     password=getenv("POSTGRES_PASSWORD"),
     port=int(getenv("POSTGRES_PORT", "5432")),
     database=getenv("POSTGRES_DB"),
-    host=getenv("POSTGRES_HOST", "localhost"),
+    host=getenv("POSTGRES_HOST"),
 )
 
 engine = create_async_engine(url_object, echo=True)
