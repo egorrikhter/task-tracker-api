@@ -2,11 +2,10 @@ import uuid
 from datetime import datetime
 from uuid import UUID
 
+from database import Base
 from sqlalchemy import DateTime, ForeignKey, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import String
-
-from database import Base
 
 
 class User(Base):
