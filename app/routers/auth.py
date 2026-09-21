@@ -1,5 +1,7 @@
+import os
 from typing import Annotated
 
+from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -8,10 +10,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models import User
-from app.schemas import TokenResponse, UserCreate, UserLogin, UserRead
-from app.security import create_access_token, hash_password, verify_password
+from app.schemas import TokenRefresh, TokenResponse, UserCreate, UserLogin, UserRead
+from app.security import (
+    access_refresh_resp,
+    get_user_id,
+    hash_password,
+    verify_password,
+    verify_token,
+)
 
+load_dotenv()
 router = APIRouter()
+DUMMY_HASH = os.getenv("DUMMY_HASH")
+credentials_exception = HTTPException(
+    status_code=401,
+    detail="Could not validate credentials.",
+    headers={"WWW-Authenticate": 'Bearer error="invalid_token"'},
+)
 
 
 @router.post("/register", response_model=UserRead)
@@ -38,18 +53,45 @@ async def login_user(
 ):
     email = user_data.email
     password = user_data.password
-    id = await db.scalar(select(User.id).where(User.email == email))
-    password_hash = await db.scalar(
-        select(User.password_hash).where(User.email == email)
-    )
-    if password_hash is not None:
-        if verify_password(password, password_hash):
-            access_token = create_access_token(id)
-        else:
-            raise HTTPException(status_code=401, detail="The password is incorrect")
+    user = (
+        await db.execute(select(User).where(User.email == email))
+    ).scalar_one_or_none()
+    if user and user.password_hash:
+        target_hash = user.password_hash
     else:
-        raise HTTPException(status_code=401, detail="The email address is incorrect.")
-    return access_token
+        target_hash = DUMMY_HASH
+
+    is_valid = verify_password(password, str(target_hash))
+
+    if user and is_valid:
+        tokens = access_refresh_resp(user.id)
+        return tokens
+    else:
+        raise HTTPException(status_code=401, detail="Invalid credentials.")
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def token_refresh(
+    refresh_token: TokenRefresh, db: Annotated[AsyncSession, Depends(get_db)]
+):
+    payload = verify_token(refresh_token.refresh_token)
+
+    if payload.get("type") != "refresh":
+        raise credentials_exception
+
+    user_id_str = payload.get("sub")
+
+    user_id = get_user_id(user_id_str)
+
+    user = (
+        await db.execute(select(User).where(User.id == user_id))
+    ).scalar_one_or_none()
+
+    if not user:
+        raise credentials_exception
+
+    tokens = access_refresh_resp(user_id)
+    return tokens
 
 
 @router.get("/me")
