@@ -6,7 +6,7 @@ from sqlalchemy import DateTime, ForeignKey, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import String
 
-from database import Base
+from app.database import Base
 
 
 class User(Base):
