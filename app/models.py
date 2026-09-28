@@ -3,7 +3,7 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import DateTime, ForeignKey, UniqueConstraint, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import String
 
 from app.database import Base
@@ -49,6 +49,9 @@ class Task(Base):
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="todo")
+    tags: Mapped[list["Tag"]] = relationship(
+        "Tag", secondary="task_tags", back_populates="tasks"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -66,6 +69,9 @@ class Tag(Base):
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    tasks: Mapped[list[Task]] = relationship(
+        Task, secondary="task_tags", back_populates="tags"
+    )
 
 
 class TaskTag(Base):

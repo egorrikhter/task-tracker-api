@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import Enum
 from typing import Annotated
 from uuid import UUID
 
@@ -8,7 +9,15 @@ from pydantic import (
     ConfigDict,
     EmailStr,
     Field,
+    StringConstraints,
+    field_validator,
 )
+
+
+class TaskStatus(str, Enum):
+    TODO = "todo"
+    IN_PROGRESS = "in_progress"
+    DONE = "done"
 
 
 def pass_len(password: str) -> str:
@@ -56,3 +65,78 @@ class TokenResponse(BaseModel):
 
 class TokenRefresh(BaseModel):
     refresh_token: str
+
+
+class ProjectCreate(BaseModel):
+    title: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=3, max_length=255)
+    ]
+
+
+class ProjectUpdate(BaseModel):
+    title: (
+        Annotated[
+            str, StringConstraints(strip_whitespace=True, min_length=3, max_length=255)
+        ]
+        | None
+    ) = None
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, v):
+        if v is None:
+            raise ValueError("The title cannot be None.")
+        return v
+
+
+class ProjectRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    title: str
+    owner_id: UUID
+    created_at: datetime
+
+
+class TaskCreate(BaseModel):
+    title: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=3, max_length=255)
+    ]
+    status: TaskStatus = Field(default=TaskStatus.TODO)
+    assignee_id: UUID | None = None
+    project_id: UUID
+
+
+class TaskUpdate(BaseModel):
+    title: (
+        Annotated[
+            str, StringConstraints(strip_whitespace=True, min_length=3, max_length=255)
+        ]
+        | None
+    ) = None
+    status: TaskStatus | None = None
+    assignee_id: UUID | None = None
+
+
+class TagCreate(BaseModel):
+    name: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=3, max_length=50)
+    ]
+
+
+class TagRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    name: str
+
+
+class TaskRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    project_id: UUID
+    creator_id: UUID
+    assignee_id: UUID | None
+    title: str
+    status: TaskStatus
+    tags: list[TagRead] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
