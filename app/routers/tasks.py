@@ -1,6 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
+import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +10,7 @@ from sqlalchemy.sql import delete, select
 
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.models import Project, Task, User
+from app.models import Project, Tag, Task, User
 from app.schemas import TaskCreate, TaskRead, TaskUpdate
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
@@ -135,17 +136,44 @@ async def patch_task(
     if not update_data_dict:
         return task
 
+    if "tags" in update_data_dict:
+        incoming_tags = update_data_dict.pop("tags")
+
+        if not incoming_tags:
+            task.tags = []
+
+        else:
+            result = await db.scalars(select(Tag).where(Tag.name.in_(incoming_tags)))
+            existing_tags = result.all()
+            existing_tags_set = {tag.name for tag in existing_tags}
+            diff_tags = set(incoming_tags) - existing_tags_set
+            new_tags = [Tag(name=name) for name in diff_tags]
+            task.tags = new_tags + list(existing_tags)
+
     for key, value in update_data_dict.items():
         setattr(task, key, value)
 
     try:
         await db.commit()
         await db.refresh(task, attribute_names=["updated_at"])
-    except IntegrityError:
+    except IntegrityError as e:
         await db.rollback()
-        raise HTTPException(
-            status_code=409, detail="The task name must be unique within the project."
-        )
+
+        if isinstance(e.orig, asyncpg.UniqueViolationError):
+            constraint = getattr(e.orig, "constraint_name", None)
+
+            if constraint == "tags_name_key":
+                raise HTTPException(
+                    status_code=409,
+                    detail="A tag with this name already exists or is being created concurrently. Please retry.",
+                )
+            elif constraint == "uq_title_and_project":
+                raise HTTPException(
+                    status_code=409,
+                    detail="The task name must be unique within the project.",
+                )
+
+        raise
 
     return task
 

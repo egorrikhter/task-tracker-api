@@ -20,6 +20,26 @@ class TaskStatus(str, Enum):
     DONE = "done"
 
 
+def remove_duplicates(v) -> list:
+    if isinstance(v, list):
+        return list(dict.fromkeys(v))
+    return v
+
+
+TagName = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True, min_length=3, max_length=50, to_lower=True
+    ),
+]
+
+
+TagList = Annotated[
+    list[TagName],
+    AfterValidator(remove_duplicates),
+]
+
+
 def pass_len(password: str) -> str:
     if len(password) < 8:
         raise ValueError("Password length is below the minimum allowed.")
@@ -104,6 +124,7 @@ class TaskCreate(BaseModel):
     status: TaskStatus = Field(default=TaskStatus.TODO)
     assignee_id: UUID | None = None
     project_id: UUID
+    tags: TagList = None  # type: ignore
 
 
 class TaskUpdate(BaseModel):
@@ -115,6 +136,7 @@ class TaskUpdate(BaseModel):
     ) = None
     status: TaskStatus | None = None
     assignee_id: UUID | None = None
+    tags: TagList = None  # type: ignore
 
 
 class TagCreate(BaseModel):
