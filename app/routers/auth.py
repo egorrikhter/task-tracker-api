@@ -20,7 +20,7 @@ from app.security import (
 )
 
 load_dotenv()
-router = APIRouter()
+router = APIRouter(prefix="/auth", tags=["Authentication"])
 DUMMY_HASH = os.getenv("DUMMY_HASH")
 credentials_exception = HTTPException(
     status_code=401,

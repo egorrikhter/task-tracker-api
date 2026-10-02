@@ -70,7 +70,7 @@ class Tag(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     tasks: Mapped[list[Task]] = relationship(
-        Task, secondary="task_tags", back_populates="tasks"
+        "Task", secondary="task_tags", back_populates="tags"
     )
 
 

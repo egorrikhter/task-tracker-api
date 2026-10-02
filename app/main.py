@@ -4,12 +4,14 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.routers.auth import router as auth_router
+from app.routers.tasks import router as tasks_router
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
+app.include_router(auth_router)
+app.include_router(tasks_router)
 
 
 @app.exception_handler(Exception)
