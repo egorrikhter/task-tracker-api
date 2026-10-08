@@ -50,7 +50,7 @@ class Task(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="todo")
     tags: Mapped[list["Tag"]] = relationship(
-        "Tag", secondary="task_tags", back_populates="tasks"
+        "Tag", secondary="task_tags", back_populates="tasks", lazy="selectin"
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
