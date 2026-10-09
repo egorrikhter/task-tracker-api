@@ -70,6 +70,7 @@ async def login_user(
         raise HTTPException(status_code=401, detail="Invalid credentials.")
 
 
+@router.post("/refresh", response_model=TokenResponse)
 async def token_refresh(
     refresh_token: TokenRefresh, db: Annotated[AsyncSession, Depends(get_db)]
 ):
