@@ -1,8 +1,10 @@
-from datetime import datetime_CAPI
+from uuid import uuid4
 
 from httpx import AsyncClient
 from sqlalchemy.sql import select
 
+from app.dependencies import get_current_user
+from app.main import app
 from app.models import User
 
 
@@ -31,7 +33,7 @@ async def test_register(async_client: AsyncClient, db_session):
 
 async def test_register_email_exists(async_client: AsyncClient, sample_user):
 
-    email = "test@test.com"
+    email = sample_user.email
     username = "testusername"
     password = "testpassword"
 
@@ -210,5 +212,53 @@ async def test_invalid_token(async_client: AsyncClient):
         "/auth/refresh",
         json={"refresh_token": "some string"},
     )
+
+    assert response.status_code == 401
+
+
+async def test_dependencies(async_client: AsyncClient, db_session):
+
+    app.dependency_overrides.pop(get_current_user, None)
+
+    email = f"user_{uuid4().hex[:8]}@test.com"
+    username = "testname"
+    password = "testpassword"
+
+    create_user = await async_client.post(
+        "/auth/register",
+        json={"email": email, "username": username, "password": password},
+    )
+
+    assert create_user.status_code == 200
+
+    login_user = await async_client.post(
+        "/auth/login", json={"email": email, "username": username, "password": password}
+    )
+
+    assert login_user.status_code == 200
+    access_token = login_user.json()["access_token"]
+
+    response = await async_client.get(
+        "/projects", headers={"Authorization": f"Bearer {access_token}"}
+    )
+
+    assert response.status_code == 200
+
+
+async def test_fake_token_login(async_client: AsyncClient, db_session):
+
+    app.dependency_overrides.pop(get_current_user, None)
+
+    response = await async_client.get(
+        "/projects", headers={"Authorization": f"Bearer {'some fake token'}"}
+    )
+
+    assert response.status_code == 401
+
+
+async def test_without_token(async_client: AsyncClient, db_session):
+
+    app.dependency_overrides.pop(get_current_user, None)
+    response = await async_client.get("/projects")
 
     assert response.status_code == 401

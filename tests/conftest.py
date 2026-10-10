@@ -1,5 +1,6 @@
 import os
 from collections.abc import AsyncGenerator
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -64,7 +65,9 @@ async def async_client() -> AsyncGenerator[httpx.AsyncClient, None]:
 
 @pytest.fixture
 async def sample_user(db_session):
-    user = User(email="test@test.com", username="test", password_hash="test")
+    user = User(
+        email=f"user_{uuid4().hex[:8]}@test.com", username="test", password_hash="test"
+    )
     db_session.add(user)
     await db_session.commit()
     return user
@@ -97,7 +100,11 @@ async def sample_project(db_session, sample_user):
 
 @pytest.fixture
 async def another_user(db_session):
-    user = User(email="test2@test@.com", username="test2", password_hash="test2")
+    user = User(
+        email=f"user_{uuid4().hex[:8]}@test.com",
+        username="test2",
+        password_hash="test2",
+    )
     db_session.add(user)
     await db_session.commit()
     return user
