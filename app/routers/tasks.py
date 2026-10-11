@@ -159,9 +159,9 @@ async def patch_task(
     except IntegrityError as e:
         await db.rollback()
 
-        if isinstance(e.orig, asyncpg.UniqueViolationError):
-            constraint = getattr(e.orig, "constraint_name", None)
-
+        cause = getattr(e.orig, "__cause__", e.orig)
+        if isinstance(cause, asyncpg.UniqueViolationError):
+            constraint = getattr(cause, "constraint_name", None)
             if constraint == "tags_name_key":
                 raise HTTPException(
                     status_code=409,
@@ -172,7 +172,6 @@ async def patch_task(
                     status_code=409,
                     detail="The task name must be unique within the project.",
                 )
-
         raise
 
     return task

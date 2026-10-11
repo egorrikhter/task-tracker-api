@@ -1,3 +1,4 @@
+from asyncio.tasks import create_task
 from uuid import uuid4
 
 from httpx import AsyncClient
@@ -144,3 +145,35 @@ async def test_delete_strange_task(
 
     response = await async_client.delete(f"/tasks/{sample_task.id}")
     assert response.status_code == 404
+
+
+async def test_patch_tags(async_client: AsyncClient, sample_user, sample_task):
+    app.dependency_overrides[get_current_user] = lambda: sample_user
+
+    response = await async_client.patch(
+        f"/tasks/{sample_task.id}", json={"tags": ["backend", "testing"]}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    tag_names = {tag["name"] for tag in data["tags"]}
+    assert tag_names == {"backend", "testing"}
+
+
+async def test_unique_tasks(async_client: AsyncClient, sample_user, sample_project):
+    app.dependency_overrides[get_current_user] = lambda: sample_user
+
+    task_a_title = "Task_A"
+    task_b_title = "Task_b"
+
+    create_task_a = await async_client.post(
+        "/tasks", json={"title": task_a_title, "project_id": str(sample_project.id)}
+    )
+    create_task_b = await async_client.post(
+        "/tasks", json={"title": task_b_title, "project_id": str(sample_project.id)}
+    )
+    task_a_id = str(create_task_a.json()["id"])
+    response = await async_client.patch(
+        f"/tasks/{task_a_id}", json={"title": task_b_title}
+    )
+    assert response.status_code == 409
