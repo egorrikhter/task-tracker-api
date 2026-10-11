@@ -37,6 +37,6 @@ jobs:
               env:
                 TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/tracker_test
                 SECRET_KEY: ${{ secrets.SECRET_KEY }}
-                DUMMY_HASH: ${{ secrets.DUMMAY_HASH }}
+                DUMMY_HASH: ${{ secrets.DUMMY_HASH }}
               run: |
                       pytest --cov=app --cov-report=term-missing --cov-fail-under=85
