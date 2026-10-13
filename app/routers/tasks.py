@@ -2,16 +2,22 @@ from typing import Annotated
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from sqlalchemy.sql import delete, select
+from sqlalchemy.sql import delete, func, select
 
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models import Project, Tag, Task, User
-from app.schemas import TaskCreate, TaskRead, TaskUpdate
+from app.schemas import (
+    PaginatedResponse,
+    TaskCreate,
+    TaskRead,
+    TaskStatus,
+    TaskUpdate,
+)
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
@@ -60,29 +66,48 @@ async def create_task(
     return task
 
 
-@router.get("", response_model=list[TaskRead])
+@router.get("", response_model=PaginatedResponse[TaskRead])
 async def get_tasks(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    limit: int = Query(20, ge=1, le=100),
     project_id: UUID | None = None,
+    offset: int = Query(0, ge=0),
+    status: TaskStatus | None = None,
 ):
     query = (
-        (
-            select(Task)
-            .join(Project, Project.id == Task.project_id)
-            .where(Project.owner_id == current_user.id)
-        )
-        .options(selectinload(Task.tags))
-        .order_by(Task.created_at.desc())
+        select(Task)
+        .join(Project, Project.id == Task.project_id)
+        .where(Project.owner_id == current_user.id)
     )
 
     if project_id is not None:
         query = query.where(Task.project_id == project_id)
 
+    if status is not None:
+        query = query.where(Task.status == status)
+
+    count_query = select(func.count()).select_from(query.subquery())
+    query = (
+        query.options(selectinload(Task.tags))
+        .order_by(Task.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+
     result = await db.execute(query)
+
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
     tasks = result.scalars().all()
 
-    return tasks
+    return {
+        "items": tasks,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.get("/{task_id}", response_model=TaskRead)

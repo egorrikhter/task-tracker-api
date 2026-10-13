@@ -94,8 +94,7 @@ async def test_get_tasks(async_client: AsyncClient, sample_user, sample_task):
     response = await async_client.get("/tasks")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) >= 1
-    assert any(task["id"] == str(sample_task.id) for task in data)
+    assert any(task["id"] == str(sample_task.id) for task in data["items"])
 
 
 async def test_delete_task(async_client: AsyncClient, sample_user, sample_task):

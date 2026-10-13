@@ -3,6 +3,7 @@ from enum import Enum
 from typing import Annotated
 from uuid import UUID
 
+from fastapi import Query
 from pydantic import (
     AfterValidator,
     BaseModel,
@@ -162,3 +163,10 @@ class TaskRead(BaseModel):
     tags: list[TagRead] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
+
+
+class PaginatedResponse[T](BaseModel):
+    items: list[T]
+    total: int
+    limit: int
+    offset: int
