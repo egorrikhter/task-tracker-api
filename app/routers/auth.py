@@ -21,7 +21,9 @@ from app.security import (
 
 load_dotenv()
 router = APIRouter(prefix="/auth", tags=["Auth"])
-DUMMY_HASH = os.getenv("DUMMY_HASH")
+DUMMY_HASH = os.getenv(
+    "DUMMY_HASH", "$2b$12$af7l9RecfGb5X/JBfLUb0u4dLyJIyStTW7RfF9FmPE3TVqoM02tX."
+)
 credentials_exception = HTTPException(
     status_code=401,
     detail="Could not validate credentials.",
