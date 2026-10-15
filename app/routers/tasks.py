@@ -13,6 +13,7 @@ from app.dependencies import get_current_user
 from app.models import Project, Tag, Task, User
 from app.schemas import (
     PaginatedResponse,
+    TagName,
     TaskCreate,
     TaskRead,
     TaskStatus,
@@ -74,6 +75,8 @@ async def get_tasks(
     project_id: UUID | None = None,
     offset: int = Query(0, ge=0),
     status: TaskStatus | None = None,
+    tag: TagName | None = None,
+    order: str = Query("desc", pattern="^(asc|desc)$"),
 ):
     query = (
         select(Task)
@@ -87,12 +90,20 @@ async def get_tasks(
     if status is not None:
         query = query.where(Task.status == status)
 
+    if tag is not None:
+        query = query.where(Task.tags.any(Tag.name == tag))
+
     count_query = select(func.count()).select_from(query.subquery())
+
+    order_by_clause = (
+        Task.created_at.desc() if order == "desc" else Task.created_at.asc()
+    )
+
     query = (
         query.options(selectinload(Task.tags))
-        .order_by(Task.created_at.desc())
         .limit(limit)
         .offset(offset)
+        .order_by(order_by_clause)
     )
 
     result = await db.execute(query)

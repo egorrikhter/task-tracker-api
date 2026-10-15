@@ -1,6 +1,6 @@
-from asyncio.tasks import create_task
 from uuid import uuid4
 
+import pytest
 from httpx import AsyncClient
 
 from app.dependencies import get_current_user  # Проверь правильность пути импорта
@@ -176,3 +176,108 @@ async def test_unique_tasks(async_client: AsyncClient, sample_user, sample_proje
         f"/tasks/{task_a_id}", json={"title": task_b_title}
     )
     assert response.status_code == 409
+
+
+@pytest.mark.parametrize(
+    "invalid_params",
+    [{"limit": 0}, {"limit": 101}, {"offset": -1}, {"order": "unknown"}],
+)
+async def test_limit(async_client: AsyncClient, sample_user, invalid_params):
+    app.dependency_overrides[get_current_user] = lambda: sample_user
+
+    response = await async_client.get("/tasks", params=invalid_params)
+
+    assert response.status_code == 422
+
+
+async def test_pagination(async_client: AsyncClient, sample_user, sample_project):
+    app.dependency_overrides[get_current_user] = lambda: sample_user
+
+    for i in range(1, 5):
+        res = await async_client.post(
+            "/tasks", json={"title": f"Task{i}", "project_id": str(sample_project.id)}
+        )
+
+    first_response = await async_client.get(
+        "/tasks",
+        params={"limit": 2, "offset": 0},
+    )
+
+    assert first_response.status_code == 200
+    first_data = first_response.json()
+    assert first_data["total"] == 4
+    assert len(first_data["items"]) == 2
+
+    second_response = await async_client.get("/tasks", params={"limit": 2, "offset": 2})
+    assert second_response.status_code == 200
+    second_data = second_response.json()
+    first_ids = {task["id"] for task in first_data["items"]}
+    second_ids = {task["id"] for task in second_data["items"]}
+    assert first_ids.isdisjoint(second_ids)
+
+    assert len(first_data | second_data) == 4
+
+
+async def test_filtration(async_client: AsyncClient, sample_user, sample_project):
+    app.dependency_overrides[get_current_user] = lambda: sample_user
+
+    first_task = await async_client.post(
+        "/tasks",
+        json={"title": "TodoTask", "project_id": str(sample_project.id)},
+    )
+    assert first_task.status_code == 201
+
+    second_task = await async_client.post(
+        "/tasks",
+        json={"title": "DoneTask", "project_id": str(sample_project.id)},
+    )
+    assert second_task.status_code == 201
+
+    first_task_id = first_task.json()["id"]
+
+    # Обновляем статус и навешиваем тег через PATCH
+    patch_res = await async_client.patch(
+        f"/tasks/{first_task_id}",
+        json={"status": "done", "tags": ["backend"]},
+    )
+    assert patch_res.status_code == 200
+
+    # Фильтрация по статусу
+    get_status = await async_client.get("/tasks", params={"status": "done"})
+    assert get_status.status_code == 200
+    status_data = get_status.json()
+    assert status_data["total"] == 1
+    assert len(status_data["items"]) == 1
+    assert status_data["items"][0]["status"] == "done"
+
+    # Фильтрация по тегу
+    get_tags = await async_client.get("/tasks", params={"tag": "backend"})
+    assert get_tags.status_code == 200
+    tags_data = get_tags.json()
+    assert tags_data["total"] == 1
+    assert len(tags_data["items"]) == 1
+    assert any(t["name"] == "backend" for t in tags_data["items"][0]["tags"])
+
+
+async def test_sorting(async_client: AsyncClient, sample_user, sample_project):
+    app.dependency_overrides[get_current_user] = lambda: sample_user
+
+    for i in range(1, 5):
+        res = await async_client.post(
+            "/tasks", json={"title": f"Task{i}", "project_id": str(sample_project.id)}
+        )
+        assert res.status_code == 201
+
+    res_desc = await async_client.get("/tasks", params={"order": "desc"})
+    assert res_desc.status_code == 200
+
+    desc_data = res_desc.json()
+
+    res_asc = await async_client.get("/tasks", params={"order": "asc"})
+    assert res_asc.status_code == 200
+
+    asc_data = res_asc.json()
+
+    desc_ids = [task["id"] for task in desc_data["items"]]
+    asc_ids = [task["id"] for task in asc_data["items"]]
+    assert desc_ids == list(reversed(asc_ids))

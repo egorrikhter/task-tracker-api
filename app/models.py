@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, UniqueConstraint, func
+from sqlalchemy import DateTime, ForeignKey, Index, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import String
 
@@ -61,6 +61,7 @@ class Task(Base):
 
     __table_args__ = (
         UniqueConstraint("project_id", "title", name="uq_title_and_project"),
+        Index("ix_title_project_id_status", "project_id", "status"),
     )
 
 
