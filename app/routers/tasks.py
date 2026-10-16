@@ -2,7 +2,7 @@ from typing import Annotated
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -28,6 +28,7 @@ async def create_task(
     task_data: TaskCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    request: Request,
 ):
     project = (
         await db.execute(
@@ -64,6 +65,12 @@ async def create_task(
         raise HTTPException(
             status_code=409, detail="The task name within the project must be unique."
         )
+
+    await request.app.state.arq_redis.enqueue_job(
+        "notify_task_created",
+        email=current_user.email,
+        task_title=task.title,
+    )
     return task
 
 

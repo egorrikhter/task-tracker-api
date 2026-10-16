@@ -3,7 +3,6 @@ from enum import Enum
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Query
 from pydantic import (
     AfterValidator,
     BaseModel,

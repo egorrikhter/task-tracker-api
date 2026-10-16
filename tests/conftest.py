@@ -1,5 +1,6 @@
 import os
 from collections.abc import AsyncGenerator
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import httpx
@@ -108,3 +109,10 @@ async def another_user(db_session):
     db_session.add(user)
     await db_session.commit()
     return user
+
+
+@pytest.fixture(autouse=True)
+def mock_arq_redis():
+    mock = AsyncMock()
+    app.state.arq_redis = mock
+    return mock

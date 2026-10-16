@@ -3,7 +3,7 @@ from uuid import uuid4
 import pytest
 from httpx import AsyncClient
 
-from app.dependencies import get_current_user  # Проверь правильность пути импорта
+from app.dependencies import get_current_user
 from app.main import app
 
 
@@ -281,3 +281,21 @@ async def test_sorting(async_client: AsyncClient, sample_user, sample_project):
     desc_ids = [task["id"] for task in desc_data["items"]]
     asc_ids = [task["id"] for task in asc_data["items"]]
     assert desc_ids == list(reversed(asc_ids))
+
+
+async def test_task_enqueued_on_creation(
+    async_client: AsyncClient, sample_user, sample_project, mock_arq_redis
+):
+    app.dependency_overrides[get_current_user] = lambda: sample_user
+
+    response = await async_client.post(
+        "/tasks",
+        json={"title": "Redis Task", "project_id": str(sample_project.id)},
+    )
+    assert response.status_code == 201
+
+    mock_arq_redis.enqueue_job.assert_awaited_once_with(
+        "notify_task_created",
+        email=sample_user.email,
+        task_title="Redis Task",
+    )
